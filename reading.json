@@ -1,5 +1,5 @@
 {
-  "date": "August 3, 2026",
-  "levels":  { "val": 40, "capex": 85, "frag": 90, "mom": 65, "macro": 85, "sent": 70 },
+  "date": "August 4, 2026",
+  "levels":  { "val": 40, "capex": 85, "frag": 90, "mom": 60, "macro": 85, "sent": 70 },
   "weights": { "val": 20, "capex": 20, "frag": 20, "mom": 20, "macro": 10, "sent": 10 }
 }
