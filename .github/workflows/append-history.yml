@@ -1,0 +1,53 @@
+name: Append ABII history
+
+on:
+  schedule:
+    - cron: '30 10 * * *'   # ~06:30 ET, shortly after the daily reading commit
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  append:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Append today's reading to history.json
+        id: build
+        run: |
+          python3 - <<'PY'
+          import json, datetime, os
+          r = json.load(open('reading.json'))
+          lv, wt = r['levels'], r['weights']
+          totW = sum(wt.values())
+          score  = round(sum(lv[k]*wt[k] for k in wt)/totW)
+          sW = wt['val']+wt['capex']+wt['frag']
+          struct = round((lv['val']*wt['val']+lv['capex']*wt['capex']+lv['frag']*wt['frag'])/sW)
+          tW = wt['mom']+wt['macro']+wt['sent']
+          trig   = round((lv['mom']*wt['mom']+lv['macro']*wt['macro']+lv['sent']*wt['sent'])/tW)
+          iso = datetime.datetime.strptime(r['date'], '%B %d, %Y').date().isoformat()
+          try:
+              hist = json.load(open('history.json'))
+          except FileNotFoundError:
+              hist = []
+          out = os.environ['GITHUB_OUTPUT']
+          if hist and hist[-1]['date'] == iso:
+              print('already current for', iso)
+              open(out,'a').write('changed=false\n')
+          else:
+              hist = [h for h in hist if h['date'] != iso]
+              hist.append({'date': iso, 'score': score, 'struct': struct, 'trig': trig})
+              hist.sort(key=lambda h: h['date'])
+              json.dump(hist, open('history.json','w'), separators=(',',':'))
+              print('appended', iso, score)
+              open(out,'a').write('changed=true\n')
+          PY
+      - name: Commit if changed
+        if: steps.build.outputs.changed == 'true'
+        run: |
+          git config user.name  'abii-history-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add history.json
+          git commit -m "Append ABII history: $(date -u +%Y-%m-%d)"
+          git push

@@ -232,6 +232,21 @@
 
 </div><!-- /.panels -->
 
+<!-- ============ 30-DAY TREND (history.json) ============ -->
+<div style="max-width:1180px;margin:0 auto 8px;padding:0 14px">
+  <div class="panel" style="max-width:none;width:100%">
+    <div class="titlebar"><span>&#128200; TREND.LOG &mdash; ABII HISTORY</span><span class="btns"><span>_</span><span>&#9633;</span><span>&#10005;</span></span></div>
+    <div class="body" style="background:#000;color:#00ff66;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px 14px;font-family:'Courier New',monospace;font-size:12px;margin-bottom:7px;color:#33ff99">
+        <span>&#9646; ABII &mdash; last <b id="tr_n">--</b> days</span>
+        <span>NOW&nbsp;<b id="tr_now" style="color:#ffcc00">--</b> &middot; PEAK&nbsp;<b id="tr_pk">--</b> &middot; LOW&nbsp;<b id="tr_lo">--</b> &middot; 30d&nbsp;<b id="tr_chg">--</b></span>
+      </div>
+      <svg id="spark" viewBox="0 0 1000 200" style="display:block;width:100%;height:auto;background:#000;border:1px solid #123">&#9203; loading history&hellip;</svg>
+      <div id="tr_axis" style="font-family:'Courier New',monospace;font-size:10px;color:#0a7;display:flex;justify-content:space-between;margin-top:2px"></div>
+    </div>
+  </div>
+</div>
+
 <div class="fineprint">
   <b>&#9888; Reality check from the webmaster:</b> This is a transparent <i>judgment</i> model, not a validated predictor &mdash;
   the weights and default levels are defensible but subjective, and timing a market bust is genuinely near-impossible.
@@ -352,6 +367,41 @@
       if(j && j.levels && j.weights){ READING = j; applyReading(); }
     })
     .catch(function(){ /* keep embedded fallback */ });
+
+  // ===== 30-DAY TREND SPARKLINE (reads history.json, appended daily) =====
+  function renderTrend(h){
+    var svg = document.getElementById('spark'); if(!svg || !h || !h.length) return;
+    var W=1000, H=200, n=h.length, YMIN=40, YMAX=100;
+    var x=function(i){ return n<2?0:(i/(n-1))*W; };
+    var y=function(v){ return H-((Math.max(YMIN,Math.min(YMAX,v))-YMIN)/(YMAX-YMIN))*H; };
+    var s='';
+    // severity band backgrounds (elevated / high-alert / breakdown)
+    [[40,60,'#3a3a12'],[60,80,'#402a10'],[80,100,'#3f1414']].forEach(function(b){
+      s+='<rect x="0" y="'+y(b[1]).toFixed(1)+'" width="'+W+'" height="'+(y(b[0])-y(b[1])).toFixed(1)+'" fill="'+b[2]+'"/>';
+    });
+    [60,80].forEach(function(t){ s+='<line x1="0" y1="'+y(t).toFixed(1)+'" x2="'+W+'" y2="'+y(t).toFixed(1)+'" stroke="#0a3a0a" stroke-width="1" stroke-dasharray="5 5"/>'; });
+    var pts=h.map(function(d,i){ return x(i).toFixed(1)+','+y(d.score).toFixed(1); }).join(' ');
+    s+='<polygon points="0,'+H+' '+pts+' '+W+','+H+'" fill="#00ff6618"/>';
+    s+='<polyline points="'+pts+'" fill="none" stroke="#00ff66" stroke-width="6" opacity="0.28" stroke-linejoin="round" stroke-linecap="round"/>';
+    s+='<polyline points="'+pts+'" fill="none" stroke="#33ff99" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+    var last=h[n-1];
+    s+='<circle cx="'+x(n-1).toFixed(1)+'" cy="'+y(last.score).toFixed(1)+'" r="6" fill="#ffcc00"/>';
+    svg.innerHTML=s;
+    // stats
+    var scores=h.map(function(d){return d.score;});
+    var pk=Math.max.apply(null,scores), lo=Math.min.apply(null,scores);
+    var i30=Math.max(0,n-31), chg=last.score-h[i30].score;
+    function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+    set('tr_n', n); set('tr_now', last.score); set('tr_pk', pk); set('tr_lo', lo);
+    var ce=document.getElementById('tr_chg');
+    if(ce){ ce.textContent=(chg>=0?'▲ +':'▼ ')+chg; ce.style.color=(chg>=0?'#ff6a48':'#33ff99'); }
+    var ax=document.getElementById('tr_axis');
+    if(ax){ var mid=h[Math.floor(n/2)]; ax.innerHTML='<span>'+h[0].date+'</span><span>'+mid.date+'</span><span>'+last.date+'</span>'; }
+  }
+  fetch('history.json', {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(h){ if(h && h.length) renderTrend(h); })
+    .catch(function(){ /* no history yet */ });
 
   // ===== WORKING VISITOR COUNTER (localStorage, increments once per visit) =====
   (function(){
